@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Мониторинг ПК</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f7fa;
+      color: #333;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .cards-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin: 10px;
+      width: 250px;
+      text-align: center;
+      transition: transform 0.2s ease;
+    }
+    .card:hover {
+      transform: scale(1.05);
+    }
+    .value {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #2a9d8f;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 30px;
+      background: #fff;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background-color: #2a9d8f;
+      color: #fff;
+      cursor: pointer;
+    }
+    tr:hover {
+      background-color: #f1f1f1;
+    }
+  </style>
+</head>
+<body>
+  <h1>Мониторинг ресурсов</h1>
+  <div class="cards-container">
+    <div class="card"><h3>CPU</h3><div class="value" id="cpuLoad">-</div></div>
+    <div class="card"><h3>ОЗУ</h3><div class="value" id="memoryLoad">-</div></div>
+    <div class="card"><h3>Средняя нагрузка (1 / 5 / 15 мин)</h3><div class="value" id="loadAvg">-</div></div>
+    <div class="card"><h3>Диск</h3><div class="value" id="diskLoad">-</div></div>
+    <div class="card"><h3>Температура</h3><div class="value" id="temp">-</div></div>
+  </div>
+
+  <h2>Список процессов</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>PID</th>
+        <th>Имя</th>
+        <th id="sortCpu">CPU % ▲▼</th>
+        <th>Память (MB)</th>
+        <th id="sortMem">Память % ▲▼</th>
+      </tr>
+    </thead>
+    <tbody id="processList">
+      <tr><td colspan="5">Загрузка...</td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    let processes = [];
+    let sortField = null;
+    let sortDesc = true;
+
+    async function fetchStats() {
+      try {
+        const res = await fetch('/stats');
+        if (!res.ok) throw new Error('Ошибка сети');
+        const data = await res.json();
+
+        document.getElementById('cpuLoad').textContent = data.cpu.loadPercent.toFixed(2) + '%';
+        document.getElementById('memoryLoad').textContent = data.memory.loadPercent.toFixed(2) + '%';
+        document.getElementById('loadAvg').textContent =
+          data.loadAvg["1min"].toFixed(2) + ' / ' +
+          data.loadAvg["5min"].toFixed(2) + ' / ' +
+          data.loadAvg["15min"].toFixed(2);
+        document.getElementById('diskLoad').textContent = data.disk.loadPercent.toFixed(2) + '%';
+        document.getElementById('temp').textContent = data.temp.temp.toFixed(2) + '°C';
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function fetchProcs() {
+      try {
+        const res = await fetch('/procs');
+        if (!res.ok) throw new Error('Ошибка сети');
+        processes = await res.json();
+        renderProcesses();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderProcesses() {
+      if (sortField) {
+        processes.sort((a, b) => {
+          let valA = a[sortField];
+          let valB = b[sortField];
+          return sortDesc ? valB - valA : valA - valB;
+        });
+      }
+
+      const tbody = document.getElementById('processList');
+      tbody.innerHTML = '';
+      processes.forEach(proc => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${proc.pid}</td>
+          <td>${proc.name}</td>
+          <td>${proc.cpu_percent.toFixed(2)}</td>
+          <td>${proc.memory_mb.toFixed(2)}</td>
+          <td>${proc.memory_percent.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('sortCpu').addEventListener('click', () => {
+      sortField = 'cpu_percent';
+      sortDesc = !sortDesc;
+      renderProcesses();
+    });
+
+    document.getElementById('sortMem').addEventListener('click', () => {
+      sortField = 'memory_percent';
+      sortDesc = !sortDesc;
+      renderProcesses();
+    });
+
+    function update() {
+      fetchStats();
+      fetchProcs();
+    }
+
+    update();
+    setInterval(update, 2000);
+  </script>
+</body>
+</html>
