@@ -22,9 +22,10 @@ func getCPUPercent() string {
 	}
 	if len(pcts) == 0 {
 		cpuPercent = 0
+	} else {
+		cpuPercent = pcts[0]
 	}
 
-	cpuPercent = pcts[0]
 	return fmt.Sprintf(`"cpu":{"loadPercent":%f}`, cpuPercent)
 }
 
