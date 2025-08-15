@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Мониторинг ресурсов</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -15,27 +16,23 @@
       text-align: center;
       margin-bottom: 20px;
     }
-    .cards-container {
+    .charts-row {
       display: flex;
       flex-wrap: wrap;
+      gap: 20px;
       justify-content: center;
+      margin-bottom: 20px;
     }
-    .card {
+    .chart-card {
       background: #fff;
       border-radius: 10px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      padding: 20px;
-      margin: 10px;
-      width: 250px;
+      padding: 15px;
+      width: 300px;
+    }
+    .chart-card h3 {
+      margin: 0 0 10px 0;
       text-align: center;
-      transition: transform 0.2s ease;
-    }
-    .card:hover {
-      transform: scale(1.05);
-    }
-    .value {
-      font-size: 1.5em;
-      font-weight: bold;
       color: #2a9d8f;
     }
     table {
@@ -64,12 +61,45 @@
 </head>
 <body>
   <h1>Мониторинг ресурсов</h1>
-  <div class="cards-container">
-    <div class="card"><h3>CPU</h3><div class="value" id="cpuLoad">-</div></div>
-    <div class="card"><h3>ОЗУ</h3><div class="value" id="memoryLoad">-</div></div>
-    <div class="card"><h3>Средняя нагрузка (1 / 5 / 15 мин)</h3><div class="value" id="loadAvg">-</div></div>
-    <div class="card"><h3>Занятое место</h3><div class="value" id="diskLoad">-</div></div>
-    <div class="card"><h3>Температура</h3><div class="value" id="temp">-</div></div>
+
+  <!-- Первая строка -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Нагрузка CPU (%)</h3>
+      <canvas id="cpuChart"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Использование ОЗУ (%)</h3>
+      <canvas id="memChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Вторая строка -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Заполненность диска (%)</h3>
+      <canvas id="diskChart"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Температура (°C)</h3>
+      <canvas id="tempChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Третья строка -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Load Avg (1 мин)</h3>
+      <canvas id="load1Chart"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Load Avg (5 мин)</h3>
+      <canvas id="load5Chart"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Load Avg (15 мин)</h3>
+      <canvas id="load15Chart"></canvas>
+    </div>
   </div>
 
   <h2>Список процессов</h2>
@@ -93,20 +123,91 @@
     let sortField = null;
     let sortDesc = true;
 
+    const maxPoints = 30;
+    const cpuData = [], memData = [], diskData = [], tempData = [];
+    const load1Data = [], load5Data = [], load15Data = [];
+    const labels = [];
+
+    function createChart(ctx, borderColor) {
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: [],
+            borderColor: borderColor,
+            backgroundColor: borderColor + '33',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { display: false }, y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    const cpuChart = createChart(document.getElementById('cpuChart'), '#2a9d8f');
+    const memChart = createChart(document.getElementById('memChart'), '#e76f51');
+    const diskChart = createChart(document.getElementById('diskChart'), '#264653');
+    const tempChart = createChart(document.getElementById('tempChart'), '#f4a261');
+    const load1Chart = createChart(document.getElementById('load1Chart'), '#1d3557');
+    const load5Chart = createChart(document.getElementById('load5Chart'), '#457b9d');
+    const load15Chart = createChart(document.getElementById('load15Chart'), '#a8dadc');
+
     async function fetchStats() {
       try {
         const res = await fetch('/stats');
         if (!res.ok) throw new Error('Ошибка сети');
         const data = await res.json();
 
-        document.getElementById('cpuLoad').textContent = data.cpu.loadPercent.toFixed(2) + '%';
-        document.getElementById('memoryLoad').textContent = data.memory.loadPercent.toFixed(2) + '%';
-        document.getElementById('loadAvg').textContent =
-          data.loadAvg["1min"].toFixed(2) + ' / ' +
-          data.loadAvg["5min"].toFixed(2) + ' / ' +
-          data.loadAvg["15min"].toFixed(2);
-        document.getElementById('diskLoad').textContent = data.disk.loadPercent.toFixed(2) + '%';
-        document.getElementById('temp').textContent = data.temp.temp.toFixed(2) + '°C';
+        const now = new Date().toLocaleTimeString();
+        labels.push(now);
+        if (labels.length > maxPoints) labels.shift();
+
+        cpuData.push(data.cpu.loadPercent);
+        memData.push(data.memory.loadPercent);
+        diskData.push(data.disk.loadPercent);
+        tempData.push(data.temp.temp);
+        load1Data.push(data.loadAvg["1min"]);
+        load5Data.push(data.loadAvg["5min"]);
+        load15Data.push(data.loadAvg["15min"]);
+
+        [cpuData, memData, diskData, tempData, load1Data, load5Data, load15Data].forEach(arr => {
+          if (arr.length > maxPoints) arr.shift();
+        });
+
+        cpuChart.data.labels = labels;
+        cpuChart.data.datasets[0].data = cpuData;
+        cpuChart.update();
+
+        memChart.data.labels = labels;
+        memChart.data.datasets[0].data = memData;
+        memChart.update();
+
+        diskChart.data.labels = labels;
+        diskChart.data.datasets[0].data = diskData;
+        diskChart.update();
+
+        tempChart.data.labels = labels;
+        tempChart.data.datasets[0].data = tempData;
+        tempChart.update();
+
+        load1Chart.data.labels = labels;
+        load1Chart.data.datasets[0].data = load1Data;
+        load1Chart.update();
+
+        load5Chart.data.labels = labels;
+        load5Chart.data.datasets[0].data = load5Data;
+        load5Chart.update();
+
+        load15Chart.data.labels = labels;
+        load15Chart.data.datasets[0].data = load15Data;
+        load15Chart.update();
+
       } catch (err) {
         console.error(err);
       }
@@ -125,13 +226,8 @@
 
     function renderProcesses() {
       if (sortField) {
-        processes.sort((a, b) => {
-          let valA = a[sortField];
-          let valB = b[sortField];
-          return sortDesc ? valB - valA : valA - valB;
-        });
+        processes.sort((a, b) => sortDesc ? b[sortField] - a[sortField] : a[sortField] - b[sortField]);
       }
-
       const tbody = document.getElementById('processList');
       tbody.innerHTML = '';
       processes.forEach(proc => {
