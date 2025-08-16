@@ -66,6 +66,11 @@ func getTemps() string {
 	return fmt.Sprintf(`"temp":{"temp":%f}`, tempStats[0].Temperature)
 }
 
+func getHostinfo() string {
+	hInfo, _ := host.Info()
+	return hInfo.String()
+}
+
 func getStatsJson() string {
 	var wg sync.WaitGroup
 	results := make(chan string, 5)

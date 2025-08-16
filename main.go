@@ -7,13 +7,16 @@ import (
 )
 
 func main() {
-
 	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, getStatsJson())
 	})
 
 	http.HandleFunc("/procs", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, getProcs())
+	})
+
+	http.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, getHostinfo())
 	})
 
 	http.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
