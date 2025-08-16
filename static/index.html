@@ -26,6 +26,11 @@
       justify-content: center;
       margin-bottom: 20px;
     }
+    .chart-column {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
     .chart-card {
       background: #1e1e1e;
       border-radius: 10px;
@@ -99,31 +104,34 @@
   <button id="themeToggle">Светлая тема</button>
   <h1>Мониторинг ресурсов</h1>
 
-  <!-- Первая строка -->
+  <!-- Первая строка: 4 графика слева + карточка справа -->
   <div class="charts-row">
-    <div class="chart-card">
-      <h3>Нагрузка CPU (%)</h3>
-      <canvas id="cpuChart"></canvas>
+    <div class="chart-column">
+      <div class="chart-card">
+        <h3>Нагрузка CPU (%)</h3>
+        <canvas id="cpuChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Использование ОЗУ (%)</h3>
+        <canvas id="memChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Заполненность диска (%)</h3>
+        <canvas id="diskChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Температура (°C)</h3>
+        <canvas id="tempChart"></canvas>
+      </div>
     </div>
-    <div class="chart-card">
-      <h3>Использование ОЗУ (%)</h3>
-      <canvas id="memChart"></canvas>
+
+    <div class="chart-card" id="hostInfoCard" style="flex:1; max-width:320px;">
+      <h3>Информация о хосте</h3>
+      <div id="hostInfo">Загрузка...</div>
     </div>
   </div>
 
   <!-- Вторая строка -->
-  <div class="charts-row">
-    <div class="chart-card">
-      <h3>Заполненность диска (%)</h3>
-      <canvas id="diskChart"></canvas>
-    </div>
-    <div class="chart-card">
-      <h3>Температура (°C)</h3>
-      <canvas id="tempChart"></canvas>
-    </div>
-  </div>
-
-  <!-- Третья строка -->
   <div class="charts-row">
     <div class="chart-card">
       <h3>Load Avg (1 мин)</h3>
@@ -301,11 +309,38 @@
       renderProcesses();
     });
 
+    async function fetchHostInfo() {
+      try {
+        const res = await fetch('/info');
+        if (!res.ok) throw new Error('Ошибка сети');
+        const info = await res.json();
+
+        const container = document.getElementById('hostInfo');
+        container.innerHTML = `
+          <p><b>Хост:</b> ${info.hostname}</p>
+          <p><b>ID:</b> ${info.hostId}</p>
+          <p><b>Uptime:</b> ${(info.uptime/3600).toFixed(1)} ч</p>
+          <p><b>Платформа:</b> ${info.platform}</p>
+          <p><b>Семейство:</b> ${info.platformFamily}</p>
+          <p><b>ОС:</b> ${info.os}</p>
+          <p><b>Версия:</b> ${info.platformVersion}</p>
+          <p><b>Архитектура:</b> ${info.kernelArch}</p>
+          <p><b>Виртуализация:</b> ${info.virtualizationSystem}</p>
+          <p><b>Вирт. роль:</b> ${info.virtualizationRole}</p>
+          <p><b>Процессов:</b> ${info.procs}</p>
+        `;
+      } catch (err) {
+        console.error(err);
+        document.getElementById('hostInfo').innerText = 'Ошибка загрузки';
+      }
+    }
+
     function update() {
       fetchStats();
       fetchProcs();
     }
 
+    fetchHostInfo();
     update();
     setInterval(update, 2000);
   </script>
